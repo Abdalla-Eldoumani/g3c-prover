@@ -1,0 +1,54 @@
+/* Gentzen-style derivation tree layout */
+
+.proof-node {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 0.3em;
+  vertical-align: bottom;
+}
+
+.proof-premises {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 1.2em;
+}
+
+.proof-inference {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin: 2px 0;
+  gap: 0.4em;
+}
+
+.proof-line {
+  flex: 1;
+  height: 1px;
+  background: #888;
+  min-width: 2em;
+}
+
+.proof-rule {
+  font-size: 0.7em;
+  opacity: 0.6;
+  white-space: nowrap;
+  font-style: italic;
+  padding-left: 0.3em;
+}
+
+.proof-conclusion {
+  white-space: nowrap;
+  padding: 1px 0.5em;
+  font-size: 0.85em;
+  letter-spacing: 0.01em;
+}
+
+.no-proof-msg {
+  text-align: center;
+  padding: 2rem 0;
+  color: #b06060;
+  font-style: italic;
+}
