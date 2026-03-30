@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>G3c Proof Search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/prooftree.css">
+  <style>
+    :root {
+      --bg: #191a1f;
+      --bg-raised: #222329;
+      --bg-well: #16171b;
+      --border: #2d2e36;
+      --text: #c4c5cd;
+      --text-dim: #73747e;
+      --text-bright: #e8e8ed;
+      --rule-color: #8a7b60;
+      --link: #8a7b60;
+      --link-hover: #b8a47a;
+      --red: #a85454;
+      --green: #5a9e6f;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 60px; }
+
+    body {
+      font-family: "Outfit", system-ui, sans-serif;
+      font-weight: 400;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: #8a7b6030; }
+
+    a { color: var(--link); text-decoration: none; }
+    a:hover { color: var(--link-hover); }
+
+    /* Nav */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+    }
+    .nav-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 52px;
+    }
+    .nav-title {
+      font-family: "Crimson Pro", Georgia, serif;
+      font-size: 1.2rem;
+      font-weight: 500;
+      color: var(--text-bright);
+      letter-spacing: 0.02em;
+    }
+    .nav-links { display: flex; gap: 1.8rem; font-size: 0.85rem; }
+    .nav-links a { color: var(--text-dim); transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text-bright); }
+
+    /* Content container */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    /* Section headers */
+    .section-label {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 0.5rem;
+    }
+    h2 {
+      font-family: "Crimson Pro", Georgia, serif;
+      font-size: 1.7rem;
+      font-weight: 400;
+      color: var(--text-bright);
+      margin-bottom: 1.5rem;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.5rem 1.8rem;
+      margin-bottom: 1rem;
+    }
+    .card h3 {
+      font-family: "Crimson Pro", Georgia, serif;
+      font-size: 1.15rem;
+      font-weight: 500;
+      color: var(--text-bright);
+      margin-bottom: 0.8rem;
+    }
+    .card p { font-size: 0.92rem; color: var(--text); margin-bottom: 0.7rem; }
+    .card p:last-child { margin-bottom: 0; }
+
+    /* Rule table */
+    .rule-table-wrap { overflow-x: auto; }
+    .rule-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .rule-table th {
+      text-align: left;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding: 0.5rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .rule-table td {
+      padding: 0.45rem 0.8rem;
+      border-bottom: 1px solid #ffffff06;
+      font-family: "Crimson Pro", Georgia, serif;
+      font-size: 0.95rem;
+    }
+    .rule-table .rule-name {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.8rem;
+      color: var(--rule-color);
+    }
+
+    /* Input area */
+    .input-row {
+      display: flex;
+      gap: 0.6rem;
+      margin-bottom: 0.6rem;
+    }
+    .formula-input {
+      flex: 1;
+      min-width: 0;
+      background: var(--bg-well);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.7rem 1rem;
+      font-family: "Crimson Pro", Georgia, serif;
+      font-size: 1.15rem;
+      color: var(--text-bright);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .formula-input::placeholder { color: #555; }
+    .formula-input:focus { border-color: #555; }
+
+    .prove-btn {
+      background: #2a2b34;
+      border: 1px solid #3d3e48;
+      border-radius: 4px;
+      padding: 0.7rem 1.4rem;
+      color: var(--text-bright);
+      font-family: "Outfit", sans-serif;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .prove-btn:hover {
+      background: #333440;
+      border-color: #555;
+    }
+    .primary-btn {
+      background: #353640;
+      border-color: #555;
+    }
+    .primary-btn:hover {
+      background: #3e3f4a;
+      border-color: #777;
+    }
+
+    /* Symbol insertion toolbar */
+    .symbol-bar {
+      display: flex;
+      gap: 0.3rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .symbol-bar-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-right: 0.4rem;
+    }
+    .sym-btn {
+      background: var(--bg-well);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.25rem 0.6rem;
+      font-family: "Crimson Pro", Georgia, serif;
+      font-size: 1rem;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s;
+      line-height: 1.3;
+    }
+    .sym-btn:hover {
+      background: #2a2b33;
+      color: var(--text-bright);
+    }
+
+    /* Example buttons */
+    .examples-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-bottom: 1.2rem;
+      align-items: center;
+    }
+    .examples-label {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-right: 0.3rem;
+    }
+    .ex-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.2rem 0.6rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ex-btn:hover {
+      border-color: var(--rule-color);
+      color: var(--text);
+    }
+    .ex-btn.will-fail {
+      border-style: dashed;
+    }
+
+    /* Proof stats bar */
+    .stats-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      align-items: center;
+      font-size: 0.8rem;
+      padding: 0.7rem 1rem;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin-bottom: 0.6rem;
+    }
+    .stats-bar .label { color: var(--text-dim); }
+    .stats-bar .value { color: var(--text-bright); }
+    .stats-bar .provable { color: var(--green); }
+    .stats-bar .not-provable { color: var(--red); }
+
+    .export-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--rule-color);
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: "Outfit", sans-serif;
+    }
+    .export-btn:hover { color: var(--link-hover); }
+
+    /* Proof output */
+    .proof-container {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      min-height: 120px;
+      overflow-x: auto;
+      padding: 1.5rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+    .proof-container .proof-conclusion { color: var(--text-bright); }
+    .proof-container .proof-line { background: #666; }
+    .proof-container .proof-rule { color: var(--rule-color); }
+    .proof-container .proof-node {
+      font-family: "Crimson Pro", Georgia, serif;
+    }
+
+    /* Error message */
+    .error-msg {
+      color: var(--red);
+      font-size: 0.85rem;
+      margin-top: 0.4rem;
+      display: none;
+    }
+
+    /* JSON modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      max-width: 700px;
+      width: 100%;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-header {
+      padding: 1rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h3 {
+      font-family: "Crimson Pro", Georgia, serif;
+      font-weight: 500;
+      color: var(--text-bright);
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.3rem;
+      cursor: pointer;
+    }
+    .modal-body {
+      padding: 1rem 1.2rem;
+      overflow: auto;
+      flex: 1;
+    }
+    .modal-body pre {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.8rem;
+      color: var(--text);
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+    .modal-footer {
+      padding: 0.8rem 1.2rem;
+      border-top: 1px solid var(--border);
+    }
+    .copy-btn {
+      background: var(--bg-well);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.4rem 1rem;
+      color: var(--text);
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: "Outfit", sans-serif;
+    }
+    .copy-btn:hover { border-color: #555; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    /* Spacing between sections */
+    section { padding: 3.5rem 0; }
+    section + section { border-top: 1px solid #ffffff06; }
+
+    /* ---- Responsive ---- */
+
+    @media (max-width: 768px) {
+      nav { padding: 0 1rem; }
+      .nav-links { gap: 1.2rem; font-size: 0.8rem; }
+
+      .container { padding: 0 1rem; }
+
+      h2 { font-size: 1.4rem; }
+      section { padding: 2.5rem 0; }
+
+      .input-row {
+        flex-wrap: wrap;
+      }
+      .formula-input {
+        width: 100%;
+        flex: 1 1 100%;
+        font-size: 1rem;
+      }
+      .prove-btn {
+        flex: 1;
+        padding: 0.65rem 0.8rem;
+        font-size: 0.8rem;
+      }
+
+      .card {
+        padding: 1.2rem 1.2rem;
+      }
+
+      .rule-table td,
+      .rule-table th {
+        padding: 0.4rem 0.5rem;
+        font-size: 0.8rem;
+      }
+
+      .proof-container {
+        padding: 1rem 0.5rem;
+      }
+      .proof-container .proof-conclusion {
+        font-size: 0.72rem;
+      }
+      .proof-container .proof-rule {
+        font-size: 0.6rem;
+      }
+      .proof-premises {
+        gap: 0.6em;
+      }
+
+      .stats-bar {
+        gap: 0.8rem;
+        font-size: 0.75rem;
+      }
+
+      .modal {
+        max-height: 90vh;
+      }
+      .modal-body textarea {
+        font-size: 0.75rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .nav-title { font-size: 1rem; }
+      .nav-links { gap: 0.9rem; font-size: 0.75rem; }
+
+      .container { padding: 0 0.8rem; }
+
+      h2 { font-size: 1.25rem; }
+      section { padding: 2rem 0; }
+
+      .input-row {
+        gap: 0.4rem;
+      }
+      .prove-btn {
+        padding: 0.6rem 0.6rem;
+        font-size: 0.75rem;
+      }
+
+      .sym-btn {
+        padding: 0.2rem 0.45rem;
+        font-size: 0.9rem;
+      }
+
+      .ex-btn {
+        font-size: 0.68rem;
+        padding: 0.15rem 0.45rem;
+      }
+
+      .card {
+        padding: 1rem;
+      }
+      .card p {
+        font-size: 0.85rem;
+      }
+
+      .proof-container .proof-conclusion {
+        font-size: 0.65rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <span class="nav-title">G3c Proof Search</span>
+    <div class="nav-links">
+      <a href="#playground">Playground</a>
+      <a href="#theory">Theory</a>
+      <a href="#about">About</a>
+    </div>
+  </div>
+</nav>
+
+
+<section id="playground">
+  <div class="container">
+    <div class="section-label">Interactive</div>
+    <h2>Playground</h2>
+
+    <p style="font-size:0.9rem; color:var(--text); margin-bottom:1.2rem; max-width: 640px;">
+      Enter a propositional formula and the tool will try to build a cut-free
+      derivation in G3c. You can type a bare formula (it gets placed on the right
+      side of an empty sequent) or a full sequent using <code style="color:var(--text-bright)">=></code>.
+    </p>
+
+    <div class="input-row">
+      <input id="formula-input" class="formula-input" type="text"
+             placeholder="(A → B) → (¬B → ¬A)"
+             spellcheck="false" autocomplete="off" autofocus>
+      <button id="prove-btn" class="prove-btn primary-btn" title="Or press Enter">Find proof</button>
+      <button id="clear-btn" class="prove-btn" title="Clear everything">Clear</button>
+      <button id="import-btn" class="prove-btn" title="Import a ProofJS JSON">Import JSON</button>
+    </div>
+
+    <div class="symbol-bar">
+      <span class="symbol-bar-label">Insert:</span>
+      <button class="sym-btn" data-sym="¬" title="Negation">¬</button>
+      <button class="sym-btn" data-sym="∧" title="Conjunction">∧</button>
+      <button class="sym-btn" data-sym="∨" title="Disjunction">∨</button>
+      <button class="sym-btn" data-sym="→" title="Implication">→</button>
+      <button class="sym-btn" data-sym="⊥" title="Bottom / Falsum">⊥</button>
+      <button class="sym-btn" data-sym="⇒" title="Sequent arrow">⇒</button>
+      <button class="sym-btn" data-sym="(" title="Left paren">(</button>
+      <button class="sym-btn" data-sym=")" title="Right paren">)</button>
+    </div>
+
+    <div class="examples-row">
+      <span class="examples-label">Examples:</span>
+      <button class="ex-btn" data-formula="A → A">A → A</button>
+      <button class="ex-btn" data-formula="A ∨ ¬A">excluded middle</button>
+      <button class="ex-btn" data-formula="¬¬A → A">double negation</button>
+      <button class="ex-btn" data-formula="(A → B) → (¬B → ¬A)">contraposition</button>
+      <button class="ex-btn" data-formula="((A → B) → A) → A">Peirce's law</button>
+      <button class="ex-btn" data-formula="(A → B) → ((B → C) → (A → C))">transitivity</button>
+      <button class="ex-btn" data-formula="(A ∧ B) → (B ∧ A)">∧ commutativity</button>
+      <button class="ex-btn" data-formula="¬(A ∧ B) → (¬A ∨ ¬B)">De Morgan</button>
+      <button class="ex-btn" data-formula="(¬A ∧ ¬B) → ¬(A ∨ B)">De Morgan (2)</button>
+      <button class="ex-btn" data-formula="(A → B) ∧ (A → ¬B) → ¬A">reductio</button>
+      <button class="ex-btn" data-formula="(A → B) ∨ (B → C) ∨ (C → A)">3-chain</button>
+      <button class="ex-btn" data-formula="(A ∧ (A → B)) → B">modus ponens</button>
+      <button class="ex-btn" data-formula="⊥ → A">ex falso</button>
+      <button class="ex-btn" data-formula="A, A → B ⇒ B">sequent: MP</button>
+      <button class="ex-btn will-fail" data-formula="A → B">A → B</button>
+      <button class="ex-btn will-fail" data-formula="A ∧ ¬A">A ∧ ¬A</button>
+      <button class="ex-btn will-fail" data-formula="A">A</button>
+      <button class="ex-btn will-fail" data-formula="A ∨ B">A ∨ B</button>
+    </div>
+
+    <div id="error-msg" class="error-msg"></div>
+
+    <div id="stats-bar" class="stats-bar" style="display:none;">
+      <div><span class="label">Status: </span><span id="stat-status"></span></div>
+      <div><span class="label">Inferences: </span><span id="stat-nodes" class="value"></span></div>
+      <div><span class="label">Tree depth: </span><span id="stat-depth" class="value"></span></div>
+      <div><span class="label">Time: </span><span id="stat-time" class="value"></span></div>
+      <button id="export-btn" class="export-btn" style="display:none;">Export JSON</button>
+    </div>
+
+    <div id="proof-output" class="proof-container">
+      <p id="empty-state" style="color:var(--text-dim); font-size:0.85rem; font-style:italic;">
+        Type a formula above and click Find proof, or pick one of the examples.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+
+<section id="theory">
+  <div class="container">
+    <div class="section-label">Background</div>
+    <h2>How it works</h2>
+
+    <div class="card">
+      <h3>G3c in a nutshell</h3>
+      <p>
+        G3c is a sequent calculus for classical propositional logic. A sequent is
+        written <span style="font-family:'Crimson Pro',serif; color:var(--text-bright)">Γ ⇒ Δ</span>,
+        where Γ (the antecedent) is a list of assumptions and Δ (the succedent) is
+        a list of conclusions. The sequent holds when at least one formula on the
+        left is false or at least one on the right is true.
+      </p>
+      <p>
+        What makes G3c different from its relatives (like G1c or Gentzen's original LK)
+        is that weakening and contraction are built into the logical rules rather than
+        existing as separate structural rules. That's what "contraction-free" means here.
+        For proof search, this is convenient because there are fewer rule choices to
+        worry about at each step.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>The rules</h3>
+      <p>
+        Two axiom forms and eight logical rules (one left and one right rule per connective).
+        Reading top to bottom: the premise(s) are above the line, the conclusion is below.
+      </p>
+      <div class="rule-table-wrap">
+      <table class="rule-table">
+        <thead>
+          <tr><th>Rule</th><th>From (premise)</th><th>To (conclusion)</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="rule-name">Ax</td>
+            <td colspan="2">C, Γ ⇒ Δ, C &nbsp;where C is atomic</td>
+          </tr>
+          <tr>
+            <td class="rule-name">⊥L</td>
+            <td colspan="2">⊥, Γ ⇒ Δ</td>
+          </tr>
+          <tr><td class="rule-name">¬L</td><td>Γ ⇒ Δ, A</td><td>¬A, Γ ⇒ Δ</td></tr>
+          <tr><td class="rule-name">¬R</td><td>A, Γ ⇒ Δ</td><td>Γ ⇒ Δ, ¬A</td></tr>
+          <tr><td class="rule-name">∧L</td><td>A, B, Γ ⇒ Δ</td><td>A ∧ B, Γ ⇒ Δ</td></tr>
+          <tr><td class="rule-name">∧R</td><td>Γ ⇒ Δ, A &ensp;and&ensp; Γ ⇒ Δ, B</td><td>Γ ⇒ Δ, A ∧ B</td></tr>
+          <tr><td class="rule-name">∨L</td><td>A, Γ ⇒ Δ &ensp;and&ensp; B, Γ ⇒ Δ</td><td>A ∨ B, Γ ⇒ Δ</td></tr>
+          <tr><td class="rule-name">∨R</td><td>Γ ⇒ Δ, A, B</td><td>Γ ⇒ Δ, A ∨ B</td></tr>
+          <tr><td class="rule-name">→L</td><td>Γ ⇒ Δ, A &ensp;and&ensp; B, Γ ⇒ Δ</td><td>A → B, Γ ⇒ Δ</td></tr>
+          <tr><td class="rule-name">→R</td><td>A, Γ ⇒ Δ, B</td><td>Γ ⇒ Δ, A → B</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Why the search always terminates</h3>
+      <p>
+        The algorithm applies rules backward, starting from the goal sequent at the
+        bottom and working up toward axioms. Each backward step replaces a compound
+        formula with its immediate subformulas.
+      </p>
+      <p>
+        To see why this can't go on forever, define the
+        <em>depth</em> of a formula recursively: atoms have depth 0, and each
+        connective adds 1. The <em>depth of a sequent</em> is the sum of the depths
+        of all its formula occurrences. Every backward rule application strictly
+        decreases this number. Since it's a natural number, it has to hit zero
+        eventually, at which point every formula is atomic and we can check
+        whether we've reached an axiom or a dead end.
+      </p>
+      <p>
+        Because G3c is already cut-free, we also get the subformula property
+        automatically: every formula that shows up in the proof is a subformula
+        of what you typed in. The search never wanders outside that finite set.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>Input syntax</h3>
+      <p>
+        The parser accepts both Unicode symbols and ASCII fallbacks. Use whichever
+        is easier to type. You can also click the symbol buttons above the input
+        field to insert Unicode characters.
+      </p>
+      <div class="rule-table-wrap">
+      <table class="rule-table">
+        <thead><tr><th>Connective</th><th>Unicode</th><th>ASCII</th></tr></thead>
+        <tbody>
+          <tr><td>Negation</td><td style="color:var(--text-bright)">¬</td><td style="font-family:'IBM Plex Mono',monospace;font-size:0.85rem">~ or !</td></tr>
+          <tr><td>Conjunction</td><td style="color:var(--text-bright)">∧</td><td style="font-family:'IBM Plex Mono',monospace;font-size:0.85rem">/\ or &amp;</td></tr>
+          <tr><td>Disjunction</td><td style="color:var(--text-bright)">∨</td><td style="font-family:'IBM Plex Mono',monospace;font-size:0.85rem">\/ or |</td></tr>
+          <tr><td>Implication</td><td style="color:var(--text-bright)">→</td><td style="font-family:'IBM Plex Mono',monospace;font-size:0.85rem">-></td></tr>
+          <tr><td>Falsum</td><td style="color:var(--text-bright)">⊥</td><td style="font-family:'IBM Plex Mono',monospace;font-size:0.85rem">_|_</td></tr>
+          <tr><td>Sequent arrow</td><td style="color:var(--text-bright)">⇒</td><td style="font-family:'IBM Plex Mono',monospace;font-size:0.85rem">=></td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="margin-top:0.8rem;">
+        Variables are uppercase letters, optionally followed by digits:
+        A, B, P1, Q2, etc.
+        Lowercase letters are accepted too and get uppercased automatically.
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<section id="about">
+  <div class="container">
+    <div class="section-label">Context</div>
+    <h2>About</h2>
+
+    <div class="card">
+      <p>
+        This was built as a final project for PHIL 579 (Proof Theory), Winter 2026,
+        at the University of Calgary. The course is taught by Professor Richard Zach and
+        covers sequent calculi, cut-elimination, the midsequent theorem, Craig interpolation,
+        and the proof theory of intuitionistic logic.
+      </p>
+      <p>
+        The proof search implements backward chaining through the propositional
+        fragment of G3c as defined in the course textbook. Termination follows from
+        the observation that each backward rule application strictly reduces
+        sequent depth, and the subformula property ensures only subformulas of the
+        input ever appear.
+      </p>
+
+      <h3 style="margin-top:1.2rem;">References</h3>
+      <ol style="font-size:0.88rem; padding-left:1.2rem; margin-top:0.5rem; line-height:1.7;">
+        <li>Zach, R. <em>Sequents and Proofs: An Open Introduction to Proof Theory.</em> Open Logic Project, 2026.</li>
+        <li>Negri, S. and von Plato, J. <em>Structural Proof Theory.</em> Cambridge University Press, 2001.</li>
+        <li>Troelstra, A.S. and Schwichtenberg, H. <em>Basic Proof Theory.</em> 2nd ed., Cambridge University Press, 2000.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+
+<footer>
+  Abdalla ElDoumani &middot; PHIL 579 &middot; University of Calgary &middot; Winter 2026
+</footer>
+
+
+<!-- JSON export modal -->
+<div id="json-modal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>ProofJS JSON</h3>
+      <button id="close-modal" class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <pre id="json-output"></pre>
+    </div>
+    <div class="modal-footer">
+      <button id="copy-json" class="copy-btn">Copy to clipboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- JSON import modal -->
+<div id="import-modal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Import JSON</h3>
+      <button id="close-import" class="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.85rem; color:var(--text-dim); margin-bottom:0.8rem;">
+        Paste a ProofJS-format JSON object. The tool will extract the root sequent
+        or formula, place it in the input field, and attempt to prove it.
+      </p>
+      <textarea id="import-textarea" rows="10"
+        style="width:100%; background:var(--bg-well); border:1px solid var(--border);
+               border-radius:4px; padding:0.8rem; font-family:'IBM Plex Mono',monospace;
+               font-size:0.8rem; color:var(--text); resize:vertical; outline:none;"
+        placeholder='{"label": "⇒ A → A", "rule": "→R", "forest": [...]}'></textarea>
+      <div id="import-error" style="color:var(--red); font-size:0.82rem; margin-top:0.4rem; display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="run-import" class="prove-btn">Import and prove</button>
+    </div>
+  </div>
+</div>
+
+
+<script src="js/parser.js"></script>
+<script src="js/prover.js"></script>
+<script src="js/renderer.js"></script>
+<script>
+  const input = document.getElementById("formula-input");
+  const proveBtn = document.getElementById("prove-btn");
+  const clearBtn = document.getElementById("clear-btn");
+  const importBtn = document.getElementById("import-btn");
+  const errorMsg = document.getElementById("error-msg");
+  const proofOutput = document.getElementById("proof-output");
+  const emptyState = document.getElementById("empty-state");
+  const statsBar = document.getElementById("stats-bar");
+  const exportBtn = document.getElementById("export-btn");
+  const modal = document.getElementById("json-modal");
+  const importModal = document.getElementById("import-modal");
+
+  let lastProof = null;
+
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.style.display = "block";
+  }
+
+  function hideError() {
+    errorMsg.style.display = "none";
+  }
+
+  function resetOutput() {
+    hideError();
+    proofOutput.innerHTML = "";
+    statsBar.style.display = "none";
+    exportBtn.style.display = "none";
+    lastProof = null;
+    emptyState.style.display = "none";
+  }
+
+  function showEmptyState() {
+    proofOutput.innerHTML = "";
+    proofOutput.appendChild(emptyState);
+    emptyState.style.display = "block";
+  }
+
+  function runProof() {
+    resetOutput();
+
+    const raw = input.value.trim();
+    if (!raw) {
+      showEmptyState();
+      history.replaceState(null, "", window.location.pathname);
+      return;
+    }
+
+    // Update URL so the formula can be shared via link
+    history.replaceState(null, "", "#formula=" + encodeURIComponent(raw));
+
+    try {
+      const isSequent = raw.includes("=>") || raw.includes("⇒");
+      const t0 = performance.now();
+      const tree = isSequent ? Prover.proveSequent(raw) : Prover.prove(raw);
+      const elapsed = performance.now() - t0;
+
+      lastProof = tree;
+      statsBar.style.display = "flex";
+      document.getElementById("stat-time").textContent = elapsed.toFixed(1) + "ms";
+
+      const statusEl = document.getElementById("stat-status");
+      if (tree) {
+        const stats = Prover.proofStats(tree);
+        statusEl.textContent = "Provable";
+        statusEl.className = "provable";
+        document.getElementById("stat-nodes").textContent = stats.nodes;
+        document.getElementById("stat-depth").textContent = stats.depth;
+        exportBtn.style.display = "block";
+      } else {
+        statusEl.textContent = "Not provable";
+        statusEl.className = "not-provable";
+        document.getElementById("stat-nodes").textContent = "\u2014";
+        document.getElementById("stat-depth").textContent = "\u2014";
+      }
+
+      Renderer.renderTree(tree, proofOutput);
+
+      // Scroll the proof into view on mobile where it might be off-screen
+      proofOutput.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (e) {
+      showError("Parse error: " + e.message);
+    }
+  }
+
+  proveBtn.addEventListener("click", runProof);
+  input.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") runProof();
+  });
+
+  // Clear
+  clearBtn.addEventListener("click", function() {
+    input.value = "";
+    resetOutput();
+    showEmptyState();
+    history.replaceState(null, "", window.location.pathname);
+    input.focus();
+  });
+
+  // Symbol insertion
+  document.querySelectorAll(".sym-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      const sym = btn.dataset.sym;
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      const val = input.value;
+      input.value = val.slice(0, start) + sym + val.slice(end);
+      input.focus();
+      input.setSelectionRange(start + sym.length, start + sym.length);
+    });
+  });
+
+  // Example buttons
+  document.querySelectorAll(".ex-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      input.value = btn.dataset.formula;
+      runProof();
+    });
+  });
+
+  // JSON export
+  exportBtn.addEventListener("click", function() {
+    if (!lastProof) return;
+    document.getElementById("json-output").textContent = Renderer.toJSON(lastProof);
+    modal.classList.add("open");
+  });
+
+  document.getElementById("close-modal").addEventListener("click", function() {
+    modal.classList.remove("open");
+  });
+
+  modal.addEventListener("click", function(e) {
+    if (e.target === modal) modal.classList.remove("open");
+  });
+
+  document.getElementById("copy-json").addEventListener("click", function() {
+    navigator.clipboard.writeText(document.getElementById("json-output").textContent);
+    this.textContent = "Copied!";
+    var self = this;
+    setTimeout(function() { self.textContent = "Copy to clipboard"; }, 1500);
+  });
+
+  // JSON import
+  importBtn.addEventListener("click", function() {
+    document.getElementById("import-textarea").value = "";
+    document.getElementById("import-error").style.display = "none";
+    importModal.classList.add("open");
+  });
+
+  document.getElementById("close-import").addEventListener("click", function() {
+    importModal.classList.remove("open");
+  });
+
+  importModal.addEventListener("click", function(e) {
+    if (e.target === importModal) importModal.classList.remove("open");
+  });
+
+  document.getElementById("run-import").addEventListener("click", function() {
+    var importError = document.getElementById("import-error");
+    importError.style.display = "none";
+
+    var raw = document.getElementById("import-textarea").value.trim();
+    if (!raw) {
+      importError.textContent = "Paste some JSON first.";
+      importError.style.display = "block";
+      return;
+    }
+
+    try {
+      var obj = JSON.parse(raw);
+    } catch (e) {
+      importError.textContent = "Invalid JSON: " + e.message;
+      importError.style.display = "block";
+      return;
+    }
+
+    if (!obj.label || typeof obj.label !== "string") {
+      importError.textContent = 'The JSON needs a "label" field with the sequent string.';
+      importError.style.display = "block";
+      return;
+    }
+
+    importModal.classList.remove("open");
+    input.value = obj.label;
+    runProof();
+  });
+
+  // Close any open modal with Escape
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") {
+      modal.classList.remove("open");
+      importModal.classList.remove("open");
+    }
+  });
+
+  // On page load, if the URL has #formula=..., load and prove it.
+  (function() {
+    var hash = window.location.hash;
+    if (hash && hash.indexOf("#formula=") === 0) {
+      var formula = decodeURIComponent(hash.slice("#formula=".length));
+      input.value = formula;
+      runProof();
+    }
+  })();
+</script>
+
+</body>
+</html>
