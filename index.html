@@ -280,11 +280,40 @@
       background: var(--bg-raised);
       border: 1px solid var(--border);
       border-radius: 6px;
+      min-height: 280px;
+      max-height: 600px;
+      height: 55vh;
+      position: relative;
+      overflow: hidden;
+    }
+    .proof-viewport {
+      width: 100%;
+      height: 100%;
       min-height: 120px;
-      overflow-x: auto;
+      overflow: auto;
       padding: 1.5rem 1rem;
+      cursor: grab;
+    }
+    .proof-viewport.grabbing {
+      cursor: grabbing;
+      user-select: none;
+    }
+    .proof-viewport.empty {
       display: flex;
+      align-items: center;
       justify-content: center;
+      cursor: default;
+    }
+    .proof-stage-wrapper {
+      position: relative;
+    }
+    .proof-stage {
+      display: inline-block;
+      transform-origin: top left;
+      transition: transform 0.15s ease;
+    }
+    .proof-viewport.grabbing .proof-stage {
+      transition: none;
     }
     .proof-container .proof-conclusion { color: var(--text-bright); }
     .proof-container .proof-line { background: #666; }
@@ -292,6 +321,56 @@
     .proof-container .proof-node {
       font-family: "Crimson Pro", Georgia, serif;
     }
+
+    /* Zoom controls */
+    .zoom-controls {
+      position: absolute;
+      top: 0.6rem;
+      right: 0.6rem;
+      display: none;
+      gap: 0.25rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.2rem;
+      z-index: 5;
+    }
+    .zoom-controls.visible { display: flex; }
+    .zoom-btn {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      width: 1.7rem;
+      height: 1.7rem;
+      cursor: pointer;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.95rem;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .zoom-btn:hover { background: var(--bg-raised); color: var(--text-bright); }
+    .zoom-level {
+      color: var(--text-dim);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.7rem;
+      align-self: center;
+      padding: 0 0.4rem;
+      min-width: 2.5rem;
+      text-align: center;
+    }
+    .zoom-hint {
+      position: absolute;
+      bottom: 0.6rem;
+      left: 0.8rem;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-style: italic;
+      pointer-events: none;
+      display: none;
+    }
+    .zoom-hint.visible { display: block; }
 
     /* Error message */
     .error-msg {
@@ -419,6 +498,11 @@
       }
 
       .proof-container {
+        padding: 0;
+        height: 50vh;
+        min-height: 320px;
+      }
+      .proof-viewport {
         padding: 1rem 0.5rem;
       }
       .proof-container .proof-conclusion {
@@ -429,6 +513,15 @@
       }
       .proof-premises {
         gap: 0.6em;
+      }
+      .zoom-controls {
+        top: 0.4rem;
+        right: 0.4rem;
+      }
+      .zoom-hint {
+        bottom: 0.4rem;
+        left: 0.6rem;
+        font-size: 0.65rem;
       }
 
       .stats-bar {
@@ -564,9 +657,19 @@
     </div>
 
     <div id="proof-output" class="proof-container">
-      <p id="empty-state" style="color:var(--text-dim); font-size:0.85rem; font-style:italic;">
-        Type a formula above and click Find proof, or pick one of the examples.
-      </p>
+      <div class="zoom-controls" id="zoom-controls">
+        <button class="zoom-btn" id="zoom-out-btn" title="Zoom out">&minus;</button>
+        <span class="zoom-level" id="zoom-level">100%</span>
+        <button class="zoom-btn" id="zoom-in-btn" title="Zoom in">+</button>
+        <button class="zoom-btn" id="zoom-fit-btn" title="Fit to view">&#9633;</button>
+        <button class="zoom-btn" id="zoom-reset-btn" title="Reset zoom">&#8634;</button>
+      </div>
+      <div class="proof-viewport empty" id="proof-viewport">
+        <p id="empty-state" style="color:var(--text-dim); font-size:0.85rem; font-style:italic;">
+          Type a formula above and click Find proof, or pick one of the examples.
+        </p>
+      </div>
+      <div class="zoom-hint" id="zoom-hint">drag to pan &middot; ctrl+scroll to zoom</div>
     </div>
 
   </div>
@@ -712,7 +815,7 @@
 
 
 <footer>
-  Abdalla ElDoumani &mdash; <a href="https://abdallaeldoumani.vercel.app/" target="_blank">Website</a>
+  Abdalla ElDoumani &mdash; <a href="https://github.com/Abdalla-Eldoumani/g3c-prover" target="_blank">Repository for the G3c Prover</a> &mdash; <a href="https://abdallaeldoumani.vercel.app/" target="_blank">Portfolio</a>
 </footer>
 
 
@@ -768,13 +871,21 @@
   const importBtn = document.getElementById("import-btn");
   const errorMsg = document.getElementById("error-msg");
   const proofOutput = document.getElementById("proof-output");
+  const proofViewport = document.getElementById("proof-viewport");
   const emptyState = document.getElementById("empty-state");
   const statsBar = document.getElementById("stats-bar");
   const exportBtn = document.getElementById("export-btn");
   const modal = document.getElementById("json-modal");
   const importModal = document.getElementById("import-modal");
+  const zoomControls = document.getElementById("zoom-controls");
+  const zoomHint = document.getElementById("zoom-hint");
+  const zoomLevelEl = document.getElementById("zoom-level");
 
   let lastProof = null;
+  let currentStage = null;
+  let currentZoom = 1.0;
+  const MIN_ZOOM = 0.25;
+  const MAX_ZOOM = 3.0;
 
   function showError(msg) {
     errorMsg.textContent = msg;
@@ -785,19 +896,85 @@
     errorMsg.style.display = "none";
   }
 
+  function setZoom(z) {
+    currentZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+    if (currentStage) {
+      currentStage.style.transform = "scale(" + currentZoom + ")";
+      // Set explicit width/height on the stage's parent wrapper so the
+      // viewport's scroll area accounts for the scaled size
+      const naturalW = currentStage.offsetWidth;
+      const naturalH = currentStage.offsetHeight;
+      const wrapper = currentStage.parentElement;
+      if (wrapper && wrapper.classList.contains("proof-stage-wrapper")) {
+        wrapper.style.width = (naturalW * currentZoom) + "px";
+        wrapper.style.height = (naturalH * currentZoom) + "px";
+      }
+    }
+    zoomLevelEl.textContent = Math.round(currentZoom * 100) + "%";
+  }
+
+  function fitToView() {
+    if (!currentStage) return;
+    const stageW = currentStage.offsetWidth;
+    const stageH = currentStage.offsetHeight;
+    const viewW = proofViewport.clientWidth - 40;
+    const viewH = proofViewport.clientHeight - 40;
+    if (stageW <= viewW && stageH <= viewH) {
+      setZoom(1.0);
+    } else {
+      const ratio = Math.min(viewW / stageW, viewH / stageH);
+      setZoom(ratio);
+    }
+    proofViewport.scrollLeft = 0;
+    proofViewport.scrollTop = 0;
+  }
+
+  function resetView() {
+    setZoom(1.0);
+    proofViewport.scrollLeft = 0;
+    proofViewport.scrollTop = 0;
+  }
+
   function resetOutput() {
     hideError();
-    proofOutput.innerHTML = "";
     statsBar.style.display = "none";
     exportBtn.style.display = "none";
     lastProof = null;
-    emptyState.style.display = "none";
+    currentStage = null;
+    currentZoom = 1.0;
+    zoomControls.classList.remove("visible");
+    zoomHint.classList.remove("visible");
+    proofViewport.classList.remove("empty");
+    proofViewport.innerHTML = "";
   }
 
   function showEmptyState() {
-    proofOutput.innerHTML = "";
-    proofOutput.appendChild(emptyState);
+    proofViewport.innerHTML = "";
+    proofViewport.appendChild(emptyState);
+    proofViewport.classList.add("empty");
     emptyState.style.display = "block";
+  }
+
+  function renderProofTree(tree) {
+    proofViewport.innerHTML = "";
+    proofViewport.classList.remove("empty");
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "proof-stage-wrapper";
+
+    const stage = document.createElement("div");
+    stage.className = "proof-stage";
+    wrapper.appendChild(stage);
+    proofViewport.appendChild(wrapper);
+
+    Renderer.renderTree(tree, stage);
+    currentStage = stage;
+    setZoom(1.0);
+
+    if (tree) {
+      zoomControls.classList.add("visible");
+      zoomHint.classList.add("visible");
+    }
   }
 
   function runProof() {
@@ -810,7 +987,6 @@
       return;
     }
 
-    // Update URL so the formula can be shared via link
     history.replaceState(null, "", "#formula=" + encodeURIComponent(raw));
 
     try {
@@ -838,9 +1014,8 @@
         document.getElementById("stat-depth").textContent = "\u2014";
       }
 
-      Renderer.renderTree(tree, proofOutput);
+      renderProofTree(tree);
 
-      // Scroll the proof into view on mobile where it might be off-screen
       proofOutput.scrollIntoView({ behavior: "smooth", block: "nearest" });
     } catch (e) {
       showError("Parse error: " + e.message);
@@ -852,7 +1027,6 @@
     if (e.key === "Enter") runProof();
   });
 
-  // Clear
   clearBtn.addEventListener("click", function() {
     input.value = "";
     resetOutput();
@@ -881,6 +1055,79 @@
       runProof();
     });
   });
+
+  // Zoom controls
+  document.getElementById("zoom-in-btn").addEventListener("click", function() {
+    setZoom(currentZoom * 1.2);
+  });
+  document.getElementById("zoom-out-btn").addEventListener("click", function() {
+    setZoom(currentZoom / 1.2);
+  });
+  document.getElementById("zoom-fit-btn").addEventListener("click", fitToView);
+  document.getElementById("zoom-reset-btn").addEventListener("click", resetView);
+
+  // Mouse wheel: ctrl/cmd + wheel zooms, plain wheel scrolls within the viewport
+  proofViewport.addEventListener("wheel", function(e) {
+    if (!currentStage) return;
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      setZoom(currentZoom * factor);
+    }
+    // Otherwise let the browser scroll the viewport naturally
+  }, { passive: false });
+
+  // Click and drag to pan
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let scrollStartX = 0;
+  let scrollStartY = 0;
+
+  proofViewport.addEventListener("mousedown", function(e) {
+    if (proofViewport.classList.contains("empty")) return;
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    scrollStartX = proofViewport.scrollLeft;
+    scrollStartY = proofViewport.scrollTop;
+    proofViewport.classList.add("grabbing");
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", function(e) {
+    if (!isDragging) return;
+    proofViewport.scrollLeft = scrollStartX - (e.clientX - dragStartX);
+    proofViewport.scrollTop = scrollStartY - (e.clientY - dragStartY);
+  });
+
+  document.addEventListener("mouseup", function() {
+    if (isDragging) {
+      isDragging = false;
+      proofViewport.classList.remove("grabbing");
+    }
+  });
+
+  // Touch pan for mobile
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchScrollX = 0;
+  let touchScrollY = 0;
+
+  proofViewport.addEventListener("touchstart", function(e) {
+    if (proofViewport.classList.contains("empty")) return;
+    if (e.touches.length !== 1) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchScrollX = proofViewport.scrollLeft;
+    touchScrollY = proofViewport.scrollTop;
+  }, { passive: true });
+
+  proofViewport.addEventListener("touchmove", function(e) {
+    if (e.touches.length !== 1) return;
+    proofViewport.scrollLeft = touchScrollX - (e.touches[0].clientX - touchStartX);
+    proofViewport.scrollTop = touchScrollY - (e.touches[0].clientY - touchStartY);
+  }, { passive: true });
 
   // JSON export
   exportBtn.addEventListener("click", function() {
