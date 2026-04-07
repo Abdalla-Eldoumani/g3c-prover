@@ -335,7 +335,16 @@
       padding: 0.2rem;
       z-index: 5;
     }
-    .zoom-controls.visible { display: flex; }
+    .zoom-controls.visible {
+      display: flex;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+    }
+    .proof-container:hover .zoom-controls.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
     .zoom-btn {
       background: transparent;
       border: none;
@@ -370,7 +379,14 @@
       pointer-events: none;
       display: none;
     }
-    .zoom-hint.visible { display: block; }
+    .zoom-hint.visible {
+      display: block;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .proof-container:hover .zoom-hint.visible {
+      opacity: 1;
+    }
 
     /* Error message */
     .error-msg {
