@@ -8,7 +8,7 @@ A web app that does automated proof search in the propositional fragment of G3c.
 
 You enter a propositional formula or a full sequent. The app runs backward proof search through the G3c rules and either constructs a complete cut-free derivation tree or reports that the formula isn't provable. Everything happens in the browser.
 
-The proof tree is drawn in the standard Gentzen style, with horizontal lines separating premises from conclusions and each inference labeled with the rule used. There are pan and zoom controls for navigating large derivations, you can share specific formulas via URL, and proofs can be exported as JSON in a format compatible with [ProofJS](https://github.com/gleachkr/ProofJS).
+The proof tree is drawn in the standard Gentzen style, with horizontal lines separating premises from conclusions and each inference labeled with the rule used. When a formula isn't provable, the app still draws the attempted derivation and marks the dead-end branches in red, so you can see exactly where the search got stuck. There are pan and zoom controls for navigating large derivations, you can share specific formulas via URL, and proofs can be exported as JSON in a format compatible with [ProofJS](https://github.com/gleachkr/ProofJS).
 
 ## How it works
 
