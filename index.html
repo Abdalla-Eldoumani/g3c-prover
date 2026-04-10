@@ -672,6 +672,11 @@
       <button id="export-btn" class="export-btn" style="display:none;">Export JSON</button>
     </div>
 
+    <p id="fail-hint" style="display:none; font-size:0.8rem; color:var(--text-dim); margin-bottom:0.5rem; font-style:italic;">
+      The tree below shows the attempted proof. Red branches mark dead ends where all formulas
+      are atomic but no axiom applies.
+    </p>
+
     <div id="proof-output" class="proof-container">
       <div class="zoom-controls" id="zoom-controls">
         <button class="zoom-btn" id="zoom-out-btn" title="Zoom out">&minus;</button>
@@ -893,6 +898,7 @@
   const exportBtn = document.getElementById("export-btn");
   const modal = document.getElementById("json-modal");
   const importModal = document.getElementById("import-modal");
+  const failHint = document.getElementById("fail-hint");
   const zoomControls = document.getElementById("zoom-controls");
   const zoomHint = document.getElementById("zoom-hint");
   const zoomLevelEl = document.getElementById("zoom-level");
@@ -955,6 +961,7 @@
     hideError();
     statsBar.style.display = "none";
     exportBtn.style.display = "none";
+    failHint.style.display = "none";
     lastProof = null;
     currentStage = null;
     currentZoom = 1.0;
@@ -1023,14 +1030,18 @@
         document.getElementById("stat-nodes").textContent = stats.nodes;
         document.getElementById("stat-depth").textContent = stats.depth;
         exportBtn.style.display = "block";
+        renderProofTree(tree);
       } else {
+        // Run the full search to get the failed attempt tree
+        const failTree = isSequent ? Prover.proveSequentFull(raw) : Prover.proveFull(raw);
+        const failStats = Prover.proofStats(failTree);
         statusEl.textContent = "Not provable";
         statusEl.className = "not-provable";
-        document.getElementById("stat-nodes").textContent = "\u2014";
-        document.getElementById("stat-depth").textContent = "\u2014";
+        document.getElementById("stat-nodes").textContent = failStats ? failStats.nodes : "\u2014";
+        document.getElementById("stat-depth").textContent = failStats ? failStats.depth : "\u2014";
+        failHint.style.display = "block";
+        renderProofTree(failTree);
       }
-
-      renderProofTree(tree);
 
       proofOutput.scrollIntoView({ behavior: "smooth", block: "nearest" });
     } catch (e) {
