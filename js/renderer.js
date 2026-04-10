@@ -2,6 +2,7 @@
  * renderer.js
  * Takes a proof tree from the prover and draws it as a
  * Gentzen-style derivation using nested HTML divs.
+ * Failed branches (from searchFull) get a distinct visual treatment.
  */
 
 const Renderer = (() => {
@@ -23,6 +24,7 @@ const Renderer = (() => {
   function buildNode(tree) {
     const node = document.createElement("div");
     node.className = "proof-node";
+    if (tree.failed) node.classList.add("proof-node-failed");
 
     if (tree.premises.length > 0) {
       const row = document.createElement("div");
@@ -33,7 +35,6 @@ const Renderer = (() => {
       node.appendChild(row);
     }
 
-    // The horizontal line + rule label
     const inf = document.createElement("div");
     inf.className = "proof-inference";
 
@@ -48,7 +49,6 @@ const Renderer = (() => {
 
     node.appendChild(inf);
 
-    // The sequent below the line
     const conc = document.createElement("div");
     conc.className = "proof-conclusion";
     conc.textContent = sequentToString(tree.sequent);
