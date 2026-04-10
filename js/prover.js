@@ -6,6 +6,10 @@
  * apply the matching G3c rule in reverse, and recurse on the premise(s).
  * Each rule application strictly reduces the total formula depth of the
  * sequent, so search always terminates.
+ *
+ * Two search modes:
+ *   search()     - returns a proof tree on success, null on failure
+ *   searchFull() - always returns a tree, marking dead-end leaves as failed
  */
 
 const Prover = (() => {
@@ -16,8 +20,8 @@ const Prover = (() => {
     return list.some(g => equal(f, g));
   }
 
-  function proofNode(sequent, rule, premises) {
-    return { sequent, rule, premises: premises || [] };
+  function proofNode(sequent, rule, premises, failed) {
+    return { sequent, rule, premises: premises || [], failed: !!failed };
   }
 
   // G3c axioms:
@@ -36,6 +40,7 @@ const Prover = (() => {
   }
 
 
+  // Standard search: returns a tree on success, null on failure.
   function search(seq, d) {
     if (d > 200) return null;
 
@@ -64,7 +69,6 @@ const Prover = (() => {
 
     return null;
   }
-
 
   function tryLeftRule(f, restAnt, suc, d) {
     if (f.type === "neg") {
@@ -128,7 +132,86 @@ const Prover = (() => {
       const p = search({ ant: [f.left].concat(ant), suc: restSuc.concat([f.right]) }, d + 1);
       if (p) return { rule: "→R", premises: [p] };
     }
+    return null;
+  }
 
+
+  // Full search: always returns a tree. Dead-end leaves are marked failed.
+  // This lets us show the user *why* a sequent isn't provable.
+  function searchFull(seq, d) {
+    if (d > 200) return proofNode(seq, "✗", [], true);
+
+    const ax = tryAxiom(seq);
+    if (ax) return ax;
+
+    for (let i = 0; i < seq.ant.length; i++) {
+      const f = seq.ant[i];
+      if (isAtomic(f)) continue;
+
+      const rest = seq.ant.slice(0, i).concat(seq.ant.slice(i + 1));
+      const result = tryLeftFull(f, rest, seq.suc, d);
+      if (result) {
+        const anyFailed = result.premises.some(p => p.failed);
+        return proofNode(seq, result.rule, result.premises, anyFailed);
+      }
+    }
+
+    for (let i = 0; i < seq.suc.length; i++) {
+      const f = seq.suc[i];
+      if (isAtomic(f)) continue;
+
+      const rest = seq.suc.slice(0, i).concat(seq.suc.slice(i + 1));
+      const result = tryRightFull(f, seq.ant, rest, d);
+      if (result) {
+        const anyFailed = result.premises.some(p => p.failed);
+        return proofNode(seq, result.rule, result.premises, anyFailed);
+      }
+    }
+
+    // All formulas are atomic but no axiom applies: dead end
+    return proofNode(seq, "✗", [], true);
+  }
+
+  function tryLeftFull(f, restAnt, suc, d) {
+    if (f.type === "neg") {
+      const p = searchFull({ ant: restAnt, suc: suc.concat([f.sub]) }, d + 1);
+      return { rule: "¬L", premises: [p] };
+    }
+    if (f.type === "and") {
+      const p = searchFull({ ant: [f.left, f.right].concat(restAnt), suc: suc.slice() }, d + 1);
+      return { rule: "∧L", premises: [p] };
+    }
+    if (f.type === "or") {
+      const p1 = searchFull({ ant: [f.left].concat(restAnt), suc: suc.slice() }, d + 1);
+      const p2 = searchFull({ ant: [f.right].concat(restAnt), suc: suc.slice() }, d + 1);
+      return { rule: "∨L", premises: [p1, p2] };
+    }
+    if (f.type === "imp") {
+      const p1 = searchFull({ ant: restAnt, suc: suc.concat([f.left]) }, d + 1);
+      const p2 = searchFull({ ant: [f.right].concat(restAnt), suc: suc.slice() }, d + 1);
+      return { rule: "→L", premises: [p1, p2] };
+    }
+    return null;
+  }
+
+  function tryRightFull(f, ant, restSuc, d) {
+    if (f.type === "neg") {
+      const p = searchFull({ ant: [f.sub].concat(ant), suc: restSuc }, d + 1);
+      return { rule: "¬R", premises: [p] };
+    }
+    if (f.type === "and") {
+      const p1 = searchFull({ ant: ant.slice(), suc: restSuc.concat([f.left]) }, d + 1);
+      const p2 = searchFull({ ant: ant.slice(), suc: restSuc.concat([f.right]) }, d + 1);
+      return { rule: "∧R", premises: [p1, p2] };
+    }
+    if (f.type === "or") {
+      const p = searchFull({ ant: ant.slice(), suc: restSuc.concat([f.left, f.right]) }, d + 1);
+      return { rule: "∨R", premises: [p] };
+    }
+    if (f.type === "imp") {
+      const p = searchFull({ ant: [f.left].concat(ant), suc: restSuc.concat([f.right]) }, d + 1);
+      return { rule: "→R", premises: [p] };
+    }
     return null;
   }
 
@@ -141,7 +224,15 @@ const Prover = (() => {
     return search(Formula.parseSequent(sequentStr), 0);
   }
 
-  // Convert to the JSON format used by ProofJS (gleachkr/ProofJS).
+  // Full-tree versions for showing failed attempts
+  function proveFull(formulaStr) {
+    return searchFull({ ant: [], suc: [Formula.parse(formulaStr)] }, 0);
+  }
+
+  function proveSequentFull(sequentStr) {
+    return searchFull(Formula.parseSequent(sequentStr), 0);
+  }
+
   function toProofJS(tree) {
     if (!tree) return null;
     return {
@@ -166,6 +257,10 @@ const Prover = (() => {
     return { nodes, depth: maxDepth };
   }
 
-  return { search, prove, proveSequent, toProofJS, proofStats };
+  return {
+    search, prove, proveSequent,
+    searchFull, proveFull, proveSequentFull,
+    toProofJS, proofStats
+  };
 
 })();
