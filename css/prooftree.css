@@ -52,3 +52,19 @@
   color: #b06060;
   font-style: italic;
 }
+
+/* Failed branches in the attempted proof tree */
+.proof-node-failed > .proof-inference .proof-line {
+  background: #a85454;
+  height: 1px;
+  border: none;
+}
+
+.proof-node-failed > .proof-inference .proof-rule {
+  color: #a85454;
+  opacity: 0.9;
+}
+
+.proof-node-failed > .proof-conclusion {
+  color: #c47070;
+}
